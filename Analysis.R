@@ -208,10 +208,13 @@ library(apaTables) # For APA Tables
 #   Confirmatory Factor Analysis   #
 ####################################
 
-    model <- 'Vision of Life =~ WAIMetaphysics + WAIAgency + WAIRelationToGroup
-              Power in Life =~ WAILocusOfResponsibility
-              Pathway through Life =~ WAIMutability + WAIRelationToAuthority
+    vif(model)
+    
+    model <- 'Vision_of_Life =~ WAIMetaphysics + WAIAgency + WAIRelationToGroup
+              Pathway_through_Life =~ WAIMutability + WAIRelationToAuthority + WAILocusOfResponsibility
               '
+    #              Vision_of_Life ~~ WAILocusOfResponsibility
+    # Pathway_through_Life ~~ WAILocusOfResponsibility
     cfa_result <- cfa(model, data = data)
     summary(cfa_result, standardized=TRUE)
     semPaths(cfa_result, whatLabels="est",
@@ -221,22 +224,22 @@ library(apaTables) # For APA Tables
              style = "ram",
              mar = c(5, 5, 5, 5))
     
-####################################
-#   Exploratory Factor Analysis    #
-####################################
+#####################################
+#   Principal Component Analysis    #
+#####################################
     
   # Selects Columns we want to analyze
-    EFAdata <- data |>
+    PCAdata <- data |>
                 dplyr::select(WAIMutability, WAIRelationToAuthority, WAIMetaphysics, 
-                              WAILocusOfResponsibility, WAIAgency, WAIRelationToGroup)
-  # Creates Eigenvalues for factors  
-    eigenvalues <- eigen(cor(EFAdata))$values
+                              WAILocusOfResponsibility, WAIAgency, WAIRelationToGroup, SelfInvestmentMutability, SelfInvestmentLOR)
+  # Creates Eigenvalues for factors
+    eigenvalues <- eigen(cor(PCAdata))$values
     print(eigenvalues)
   
-  # Creates Scree Plot for Eigenvalues  
+  # Creates Scree Plot for Eigenvalues
     scree_plot <- data.frame(
-      eigenvalues = eigen(cor(EFAdata))$values,
-      component = 1:length(eigen(cor(EFAdata))$values)
+      eigenvalues = eigen(cor(PCAdata))$values,
+      component = 1:length(eigen(cor(PCAdata))$values)
     )
 
     plot(scree_plot$component, scree_plot$eigenvalues, type = "b",
@@ -244,6 +247,9 @@ library(apaTables) # For APA Tables
          main = "Scree Plot")
     abline(h = 1, col = "red", lty = 2)
     
-  # Runs EFA
-    efa_result <- fa(r = EFAdata, nfactors = 3, rotate = "varimax")
-    print(efa_result)
+  # Runs PCA
+    ncomp <- 3
+    pca_rotated <- psych::principal(PCAdata, rotate="varimax", nfactors=ncomp, scores=TRUE)
+    print(pca_rotated)
+
+    
