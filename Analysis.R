@@ -1,6 +1,6 @@
 library(readxl) # For Reading XLSX
-library(lavaan) # For FA
-library(semPlot) # For FA Plots
+library(lavaan) # For FA & PA
+library(lavaangui) # For FA & PA
 library(tidyverse) # For Everything
 library(haven) # For SPSS Output
 library(stats) # For PCA
@@ -8,6 +8,7 @@ library(car) # For Assumption Checks
 library(ltm) # For Reliability 
 library(psych) # For Descriptive
 library(apaTables) # For APA Tables 
+library(kableExtra) # Table Extra
 
   # Reads Scored Qualtrics File
     dataraw1 <- read_xlsx("data/WV_V1.xlsx") # Inputs 1st Survey
@@ -43,7 +44,7 @@ library(apaTables) # For APA Tables
                         "WAILocusOfResponsibility", "WAIAgency", "WAIRelationToGroup")
     
   # Converts to Numeric
-    data <- data %>% 
+    data <- data |>
             mutate_at(c("Age", "MathAnxiety", "MathAvoidance", "MathSelfConcept",
                         "ParentClass", "Affluency", "Religiosity", "EducationSES", "SocioeeconomicStatus",
                         "SESrank", "Prestige", "SelfInvestmentMutability", "SelfInvestmentLOR", 
@@ -199,30 +200,9 @@ library(apaTables) # For APA Tables
     sum(str_count(Race, pattern = "I Identify as"))
     sum(str_count(Race, pattern = "Prefer Not to Say")) 
   
-  # Creates Correlation Table
+  # Creates Large Correlation Table
     apa.cor.table(
-      data, filename="ex.CorTable1.doc")
-    
-
-####################################
-#   Confirmatory Factor Analysis   #
-####################################
-
-    vif(model)
-    
-    model <- 'Vision_of_Life =~ WAIMetaphysics + WAIAgency + WAIRelationToGroup
-              Pathway_through_Life =~ WAIMutability + WAIRelationToAuthority + WAILocusOfResponsibility
-              '
-    #              Vision_of_Life ~~ WAILocusOfResponsibility
-    # Pathway_through_Life ~~ WAILocusOfResponsibility
-    cfa_result <- cfa(model, data = data)
-    summary(cfa_result, standardized=TRUE)
-    semPaths(cfa_result, whatLabels="est",
-             sizeMan = 5,
-             node.width = 1,
-             edge.label.cex = .75,
-             style = "ram",
-             mar = c(5, 5, 5, 5))
+      data, filename="CorTable.doc")
     
 #####################################
 #   Principal Component Analysis    #
@@ -232,6 +212,7 @@ library(apaTables) # For APA Tables
     PCAdata <- data |>
                 dplyr::select(WAIMutability, WAIRelationToAuthority, WAIMetaphysics, 
                               WAILocusOfResponsibility, WAIAgency, WAIRelationToGroup, SelfInvestmentMutability, SelfInvestmentLOR)
+    
   # Creates Eigenvalues for factors
     eigenvalues <- eigen(cor(PCAdata))$values
     print(eigenvalues)
@@ -251,5 +232,50 @@ library(apaTables) # For APA Tables
     ncomp <- 3
     pca_rotated <- psych::principal(PCAdata, rotate="varimax", nfactors=ncomp, scores=TRUE)
     print(pca_rotated)
+    fa.diagram(pca_rotated)
 
-    
+    # Generates Charts
+      loadings_mat <- as.matrix(pca_rotated$loadings)
+      
+      table_df <- data.frame(
+        loadings_mat
+        )
+      print(table_df)
+
+      # Grabs all percentages explained
+        RC1Var <- round(pca_rotated$Vaccounted[3, 1], 3)*100
+        RC2Var <- round(pca_rotated$Vaccounted[3, 2], 3)*100
+        RC3Var <- round(pca_rotated$Vaccounted[3, 3], 3)*100
+        
+      # Edit the following as HTML Its easier than figuring out whatever madness Kable needs to work
+        kable(table_df, align = "l", caption = "Principal Loadings (Pattern Matrix)") |>
+          # add_header_above(c(" ", RC1Var, RC2Var, RC3Var)) |>
+          kable_styling(full_width = FALSE) |>
+          save_kable("RCmatrixx.html")
+        
+      # Do Communality Matrix
+        communality_mat <- as.matrix(pca_rotated$communality)
+        kable(communality_mat, align = "l", caption = "Principal Loadings (Pattern Matrix)", digits = 3) |>
+          kable_styling(full_width = FALSE)
+        
+##################################
+#   Path Analyses & MR w/Math    #
+##################################
+
+      # Creates new data that are standardized
+        PAdata <- data
+        numcols <- sapply(PAdata, is.numeric)
+        PAdata[numcols] <- lapply(PAdata[numcols], function(x) as.numeric(scale(x, center = TRUE, scale = TRUE)))
+        
+      # Runs Path Analysis  
+        model <-'
+                MathAnxiety ~ SelfInvestmentLOR + MathAvoidance 
+                SelfInvestmentLOR ~ WAILocusOfResponsibility 
+                '
+        
+        pa_fit <- cfa(model, data = data)
+        summary(pa_fit, standardized=TRUE, fit.measures =TRUE)
+        
+      # Creates Plot
+        plot_lavaan(pa_fit) 
+      
